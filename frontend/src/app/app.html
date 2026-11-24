@@ -1,0 +1,406 @@
+<style>
+  :host { display: block; min-height: 100vh; background: #f5f6f8; color: #1f2430; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  * { box-sizing: border-box; }
+  .topbar { display: flex; gap: 1.5rem; align-items: center; padding: .8rem 1.5rem; background: #1f2a44; color: #fff; }
+  .link { background: none; border: 0; color: #cfd6e6; cursor: pointer; font: inherit; }
+  .link:hover { color: #fff; }
+  .container { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+  .row { display: flex; justify-content: space-between; align-items: center; }
+  .card { background: #fff; border: 1px solid #e1e4ea; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem 1.2rem; margin-bottom: .8rem; }
+  .k { display: block; font-size: .75rem; color: #6b7385; text-transform: uppercase; }
+  label { display: block; font-size: .85rem; color: #4a5266; margin-bottom: .6rem; }
+  input, select, textarea { width: 100%; padding: .45rem .55rem; border: 1px solid #c9ced9; border-radius: 6px; font: inherit; margin-top: .2rem; background: #fff; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e1e4ea; margin-bottom: 1rem; }
+  th, td { padding: .5rem .6rem; text-align: left; border-bottom: 1px solid #eef0f4; font-size: .9rem; }
+  th { background: #f0f2f7; font-size: .75rem; text-transform: uppercase; color: #5a6275; }
+  td input { margin-top: 0; }
+  .num { text-align: right; }
+  .empty { text-align: center; color: #8a91a3; padding: 1.5rem; }
+  .btn { display: inline-block; padding: .45rem .9rem; border: 1px solid #c9ced9; border-radius: 6px; background: #fff; color: #1f2430; cursor: pointer; font: inherit; font-size: .9rem; margin-right: .4rem; }
+  .btn.primary { background: #2f5bea; border-color: #2f5bea; color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .filters { display: flex; flex-wrap: wrap; gap: .8rem 1rem; align-items: end; margin-bottom: 1rem; }
+  .filters label { margin: 0; }
+  .filters input, .filters select { width: auto; }
+  .spacer { flex: 1; }
+  .pager { display: flex; gap: 1rem; align-items: center; justify-content: center; }
+  .hint { color: #6b7385; font-size: .85rem; }
+  .alert { background: #fdecec; color: #a12626; border: 1px solid #f5c2c2; border-radius: 6px; padding: .7rem 1rem; margin-bottom: 1rem; }
+  .linkbtn { background: none; border: 0; color: #2f5bea; cursor: pointer; font: inherit; }
+  .linkbtn:disabled { opacity: .5; cursor: default; }
+  .badge { padding: .15rem .55rem; border-radius: 999px; font-size: .75rem; background: #e7e9ef; }
+  .badge.Submitted { background: #fff2cc; }
+  .badge.Approved { background: #d9f2e0; }
+  .badge.Rejected, .badge.Cancelled { background: #fbdcdc; }
+  .badge.Ordered { background: #d6e4ff; }
+  .badge.DraftPO { background: #fff2cc; }
+  .badge.Issued { background: #d9f2e0; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .viewer { background: #fff; width: min(900px, 94vw); height: 92vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+  .viewer-head { display: flex; justify-content: space-between; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid #e1e4ea; }
+  .viewer iframe { flex: 1; width: 100%; border: 0; }
+</style>
+
+<header class="topbar">
+  <strong>Procurement</strong>
+  <button class="link" (click)="showList()">Purchase Requests</button>
+  <button class="link" (click)="newRequest()">New Request</button>
+  <button class="link" (click)="showPoList()">Purchase Orders</button>
+</header>
+
+<main class="container">
+
+  @if (error()) { <div class="alert">{{ error() }}</div> }
+
+  <!-- ================= REQUEST LIST ================= -->
+  @if (view() === 'list') {
+    <h2>Purchase Requests</h2>
+
+    <div class="filters">
+      <label>Status
+        <select [ngModel]="filterStatus" (ngModelChange)="filterStatus = $event; filter()">
+          <option value="">All</option>
+          @for (s of statuses; track s) { <option [value]="s">{{ s }}</option> }
+        </select>
+      </label>
+      <label>Department
+        <select [ngModel]="filterDepartment" (ngModelChange)="filterDepartment = $event; filter()">
+          <option value="">All</option>
+          @for (d of departments; track d) { <option [value]="d">{{ d }}</option> }
+        </select>
+      </label>
+      <label>Date field
+        <select [ngModel]="dateField" (ngModelChange)="dateField = $event; filter()">
+          <option value="created">Created date</option>
+          <option value="needed">Needed-by date</option>
+        </select>
+      </label>
+      <label>From
+        <input type="date" [ngModel]="filterFrom" (ngModelChange)="filterFrom = $event; filter()" />
+      </label>
+      <label>To
+        <input type="date" [ngModel]="filterTo" (ngModelChange)="filterTo = $event; filter()" />
+      </label>
+      <label>Sort by date
+        <select [ngModel]="direction" (ngModelChange)="direction = $event; filter()">
+          <option value="desc">Newest first</option>
+          <option value="asc">Oldest first</option>
+        </select>
+      </label>
+      <button class="btn" (click)="clearFilters()">Clear filters</button>
+      <span class="spacer"></span>
+      <button class="btn primary" (click)="newRequest()">+ New request</button>
+    </div>
+
+    @if (data(); as d) {
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Requester</th><th>Department</th><th>Supplier</th>
+            <th>Needed by</th><th class="num">Total (QAR)</th><th>Status</th><th>Created</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of d.content; track r.id) {
+            <tr>
+              <td>{{ r.id }}</td>
+              <td>{{ r.requesterName }}</td>
+              <td>{{ r.department }}</td>
+              <td>{{ r.supplierName }}</td>
+              <td>{{ r.neededByDate }}</td>
+              <td class="num">{{ r.grandTotal | number: '1.2-2' }}</td>
+              <td><span [class]="badgeClass(r.status)">{{ r.status }}</span></td>
+              <td>{{ r.createdAt | date: 'dd MMM yyyy HH:mm' }}</td>
+              <td><button class="linkbtn" (click)="showDetail(r.id)">View</button></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="9" class="empty">No requests found.</td></tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="pager">
+        <button class="btn" [disabled]="d.page === 0" (click)="go(d.page - 1)">Previous</button>
+        <span>Page {{ d.page + 1 }} of {{ d.totalPages || 1 }} ({{ d.totalElements }} total)</span>
+        <button class="btn" [disabled]="d.page + 1 >= d.totalPages" (click)="go(d.page + 1)">Next</button>
+      </div>
+    }
+  }
+
+  <!-- ================= REQUEST FORM ================= -->
+  @if (view() === 'form') {
+    <h2>{{ editId ? 'Edit request #' + editId : 'New purchase request' }}</h2>
+
+    <div class="card">
+      <div class="grid">
+        <label>Requester name
+          <input [(ngModel)]="model.requesterName" />
+        </label>
+        <label>Department
+          <select [(ngModel)]="model.department">
+            <option value="">-- select --</option>
+            @for (d of departments; track d) { <option [value]="d">{{ d }}</option> }
+          </select>
+        </label>
+        <label>Needed-by date
+          <input type="date" [(ngModel)]="model.neededByDate" />
+        </label>
+        <label>Supplier name
+          <input [(ngModel)]="model.supplierName" />
+        </label>
+      </div>
+
+      <label>Justification
+        <textarea rows="3" [(ngModel)]="model.justification"></textarea>
+      </label>
+
+      <h3>Items (amounts in QAR)</h3>
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Quantity</th><th>Unit price</th><th class="num">Line (estimate)</th><th></th></tr>
+        </thead>
+        <tbody>
+          @for (it of model.items; track $index) {
+            <tr>
+              <td><input [(ngModel)]="it.name" /></td>
+              <td><input type="number" [(ngModel)]="it.quantity" /></td>
+              <td><input type="number" step="0.01" [(ngModel)]="it.unitPrice" /></td>
+              <td class="num">{{ line(it) | number: '1.2-2' }}</td>
+              <td><button class="btn" (click)="removeItem($index)">Remove</button></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <button class="btn" (click)="addItem()">+ Add item</button>
+
+      <p class="hint">Estimated total: {{ estimate() | number: '1.2-2' }} QAR (the server calculates the real total when you save)</p>
+
+      <button class="btn primary" [disabled]="saving()" (click)="save()">Save</button>
+      <button class="btn" (click)="editId && current() ? view.set('detail') : showList()">Cancel</button>
+    </div>
+  }
+
+  <!-- ================= REQUEST DETAIL ================= -->
+  @if (view() === 'detail') {
+    @if (current(); as r) {
+      <div class="row">
+        <h2>Request #{{ r.id }} <span [class]="badgeClass(r.status)">{{ r.status }}</span></h2>
+        <div>
+          @if (r.status === 'Draft') {
+            <button class="btn" (click)="editRequest(r)">Edit</button>
+          }
+          <button class="btn" (click)="showList()">Back to list</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="grid">
+          <div><span class="k">Requester</span>{{ r.requesterName }}</div>
+          <div><span class="k">Department</span>{{ r.department }}</div>
+          <div><span class="k">Needed by</span>{{ r.neededByDate }}</div>
+          <div><span class="k">Supplier</span>{{ r.supplierName }}</div>
+        </div>
+        <div><span class="k">Justification</span>{{ r.justification }}</div>
+      </div>
+
+      <!-- status actions -->
+      <div class="card">
+        <span class="k">Actions</span>
+        @if ((transitions[r.status] ?? []).length) {
+          <div style="margin: .5rem 0;">
+            @for (s of transitions[r.status]; track s) {
+              <button class="btn" [class.primary]="pending() === s" [disabled]="busy()" (click)="startChange(s)">{{ label(s) }}</button>
+            }
+          </div>
+          @if (pending(); as p) {
+            <label>Comment for "{{ label(p) }}" (minimum 5 characters)
+              <textarea rows="2" [(ngModel)]="comment"></textarea>
+            </label>
+            <button class="btn primary" [disabled]="busy()" (click)="confirmChange()">Confirm</button>
+            <button class="btn" [disabled]="busy()" (click)="cancelChange()">Cancel</button>
+          }
+        } @else {
+          <p class="hint">This request is in a final status. No more changes are possible.</p>
+        }
+        @if (linkedPo(); as po) {
+          <p>Purchase order: <button class="linkbtn" (click)="showPoDetail(po.id)">{{ po.poNumber }}</button>
+            <button class="linkbtn" [disabled]="busy()" (click)="openPdf(po.id)">View PDF</button></p>
+        }
+      </div>
+
+      <h3>Items</h3>
+      <table>
+        <thead>
+          <tr><th>Name</th><th class="num">Quantity</th><th class="num">Unit price</th><th class="num">Line total</th></tr>
+        </thead>
+        <tbody>
+          @for (i of r.items; track i.id) {
+            <tr>
+              <td>{{ i.name }}</td>
+              <td class="num">{{ i.quantity }}</td>
+              <td class="num">{{ i.unitPrice | number: '1.2-2' }}</td>
+              <td class="num">{{ i.lineTotal | number: '1.2-2' }}</td>
+            </tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="num"><strong>Grand total (QAR)</strong></td>
+            <td class="num"><strong>{{ r.grandTotal | number: '1.2-2' }}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <h3>Timeline</h3>
+      <table>
+        <thead><tr><th>When</th><th>Change</th><th>Comment</th></tr></thead>
+        <tbody>
+          @for (h of r.history; track h.id) {
+            <tr>
+              <td>{{ h.changedAt | date: 'dd MMM yyyy HH:mm' }}</td>
+              <td>{{ h.fromStatus ?? '(new)' }} → {{ h.toStatus }}</td>
+              <td>{{ h.comments }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  }
+
+  <!-- ================= PO LIST ================= -->
+  @if (view() === 'poList') {
+    <h2>Purchase Orders</h2>
+
+    <div class="filters">
+      <label>Status
+        <select [ngModel]="poStatus" (ngModelChange)="poStatus = $event; poFilter()">
+          <option value="">All</option>
+          @for (s of poStatuses; track s) { <option [value]="s">{{ s }}</option> }
+        </select>
+      </label>
+      <label>PO date from
+        <input type="date" [ngModel]="poFrom" (ngModelChange)="poFrom = $event; poFilter()" />
+      </label>
+      <label>PO date to
+        <input type="date" [ngModel]="poTo" (ngModelChange)="poTo = $event; poFilter()" />
+      </label>
+      <label>Sort by date
+        <select [ngModel]="poDirection" (ngModelChange)="poDirection = $event; poFilter()">
+          <option value="desc">Newest first</option>
+          <option value="asc">Oldest first</option>
+        </select>
+      </label>
+      <button class="btn" (click)="clearPoFilters()">Clear filters</button>
+    </div>
+
+    @if (poData(); as d) {
+      <table>
+        <thead>
+          <tr>
+            <th>PO number</th><th>PO date</th><th>Supplier</th><th>Requester</th><th>Department</th>
+            <th>Needed by</th><th class="num">Total (QAR)</th><th>Status</th><th>Issued</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of d.content; track p.id) {
+            <tr>
+              <td>{{ p.poNumber }}</td>
+              <td>{{ p.poDate }}</td>
+              <td>{{ p.supplierName }}</td>
+              <td>{{ p.requesterName }}</td>
+              <td>{{ p.department }}</td>
+              <td>{{ p.neededByDate }}</td>
+              <td class="num">{{ p.grandTotal | number: '1.2-2' }}</td>
+              <td><span [class]="badgeClass(p.status)">{{ p.status }}</span></td>
+              <td>{{ p.issuedAt ? (p.issuedAt | date: 'dd MMM yyyy HH:mm') : '-' }}</td>
+              <td>
+                <button class="linkbtn" (click)="showPoDetail(p.id)">View</button>
+                <button class="linkbtn" [disabled]="busy()" (click)="openPdf(p.id)">PDF</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="10" class="empty">No purchase orders found.</td></tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="pager">
+        <button class="btn" [disabled]="d.page === 0" (click)="goPo(d.page - 1)">Previous</button>
+        <span>Page {{ d.page + 1 }} of {{ d.totalPages || 1 }} ({{ d.totalElements }} total)</span>
+        <button class="btn" [disabled]="d.page + 1 >= d.totalPages" (click)="goPo(d.page + 1)">Next</button>
+      </div>
+    }
+  }
+
+  <!-- ================= PO DETAIL ================= -->
+  @if (view() === 'poDetail') {
+    @if (currentPo(); as po) {
+      <div class="row">
+        <h2>{{ po.poNumber }} <span [class]="badgeClass(po.status)">{{ po.status }}</span></h2>
+        <div>
+          @if (po.status === 'Draft PO') {
+            <button class="btn primary" [disabled]="busy()" (click)="issuePo()">Issue to Supplier</button>
+          }
+          <button class="btn" [disabled]="busy()" (click)="viewPdf()">View PDF</button>
+          <button class="btn" [disabled]="busy()" (click)="downloadPdf()">Download PDF</button>
+          <button class="btn" (click)="showPoList()">Back to list</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="grid">
+          <div><span class="k">PO date</span>{{ po.poDate }}</div>
+          <div><span class="k">Supplier</span>{{ po.supplierName }}</div>
+          <div><span class="k">Requester</span>{{ po.requesterName }}</div>
+          <div><span class="k">Department</span>{{ po.department }}</div>
+          <div><span class="k">Needed by</span>{{ po.neededByDate }}</div>
+          <div>
+            <span class="k">Purchase request</span>
+            <button class="linkbtn" (click)="showDetail(po.purchaseRequestId)">Request #{{ po.purchaseRequestId }}</button>
+          </div>
+        </div>
+        @if (po.issuedAt) {
+          <div><span class="k">Issued on</span>{{ po.issuedAt | date: 'dd MMM yyyy HH:mm' }}</div>
+        }
+      </div>
+
+      <h3>Items</h3>
+      <table>
+        <thead>
+          <tr><th>Name</th><th class="num">Quantity</th><th class="num">Unit price</th><th class="num">Line total</th></tr>
+        </thead>
+        <tbody>
+          @for (i of po.items ?? []; track i.id) {
+            <tr>
+              <td>{{ i.name }}</td>
+              <td class="num">{{ i.quantity }}</td>
+              <td class="num">{{ i.unitPrice | number: '1.2-2' }}</td>
+              <td class="num">{{ i.lineTotal | number: '1.2-2' }}</td>
+            </tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="num"><strong>Grand total (QAR)</strong></td>
+            <td class="num"><strong>{{ po.grandTotal | number: '1.2-2' }}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+    }
+  }
+
+  <!-- ================= INLINE PDF VIEWER ================= -->
+  @if (pdfUrl(); as url) {
+    <div class="overlay" (click)="closePdf()">
+      <div class="viewer" (click)="$event.stopPropagation()">
+        <div class="viewer-head">
+          <strong>{{ pdfTitle() }}.pdf</strong>
+          <button class="btn" (click)="closePdf()">Close</button>
+        </div>
+        <iframe [src]="url" title="Purchase order PDF"></iframe>
+      </div>
+    </div>
+  }
+
+</main>
